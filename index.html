@@ -1,0 +1,223 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>PATMA MART - Owner Dashboard</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+    <link href="https://fonts.googleapis.com/css2?family=League+Spartan:wght@300;400;600;700&display=swap" rel="stylesheet">
+    <style>
+        body { 
+            background-color: #0f172a; 
+            background-image: 
+                radial-gradient(at 0% 0%, rgba(20, 184, 166, 0.15) 0px, transparent 50%),
+                radial-gradient(at 100% 100%, rgba(13, 148, 136, 0.15) 0px, transparent 50%);
+            background-attachment: fixed;
+            font-family: 'League Spartan', sans-serif;
+        }
+        .glass-panel { background: rgba(15, 23, 42, 0.6); backdrop-filter: blur(16px); border: 1px solid rgba(45, 212, 191, 0.2); }
+        .input-glass { background: rgba(255, 255, 255, 0.03); border: 1px solid rgba(255, 255, 255, 0.1); color: #f8fafc; }
+        .input-glass:focus { border-color: #2dd4bf; box-shadow: 0 0 15px rgba(45, 212, 191, 0.3); outline: none; }
+        .wallet-gradient { background: linear-gradient(135deg, #0d9488 0%, #14b8a6 100%); }
+    </style>
+</head>
+<body class="antialiased min-h-screen p-4 md:p-8 flex flex-col items-center">
+
+    <div class="w-full max-w-6xl grid grid-cols-1 md:grid-cols-2 gap-6 mb-10 items-center">
+        <div>
+            <h1 class="text-4xl font-bold text-white tracking-wide uppercase">PATMA <span class="text-teal-400">MART</span></h1>
+            <p class="text-gray-400 font-light mt-1 text-xs uppercase">Laporan: <span id="currentDate" class="text-teal-400 font-bold"></span></p>
+            <p class="text-gray-500 text-[10px] uppercase tracking-[0.2em]">Powered by RHMTFOUNDATION</p>
+        </div>
+        <div class="wallet-gradient p-6 rounded-3xl shadow-2xl flex justify-between items-center border border-teal-400/30">
+            <div>
+                <p class="text-[10px] text-teal-100 uppercase tracking-widest font-bold">Total Saldo Owner (S.Awal + Laba)</p>
+                <h2 id="displaySaldoTotal" class="text-3xl font-bold text-white mt-1">Rp 0</h2>
+            </div>
+            <button onclick="setSaldoAwal()" class="text-[10px] bg-white/20 text-white px-3 py-2 rounded-lg hover:bg-white/30 uppercase font-bold transition">Atur Saldo</button>
+        </div>
+    </div>
+
+    <div class="w-full max-w-6xl grid grid-cols-1 lg:grid-cols-12 gap-8">
+        <div class="lg:col-span-4 glass-panel p-8 rounded-3xl shadow-2xl h-fit">
+            <h2 class="text-xl font-bold text-teal-400 mb-6 uppercase tracking-wider text-center">Input Transaksi</h2>
+            <form id="ownerForm" class="space-y-4">
+                <input type="text" id="nama" required class="input-glass w-full px-4 py-3 rounded-xl text-sm" placeholder="Nama Barang">
+                <input type="number" id="harga" required class="input-glass w-full px-4 py-3 rounded-xl text-sm" placeholder="Harga Mitra (Rp)">
+                <div class="grid grid-cols-2 gap-4">
+                    <input type="number" id="masuk" required class="input-glass px-4 py-3 rounded-xl text-sm" placeholder="Jml Masuk">
+                    <input type="number" id="terjual" required class="input-glass px-4 py-3 rounded-xl text-sm" placeholder="Terjual">
+                </div>
+                <button type="submit" class="w-full bg-teal-600 hover:bg-teal-500 text-white font-bold py-4 rounded-xl shadow-lg transition duration-300 uppercase text-sm mt-4">
+                    Simpan & Update Data
+                </button>
+            </form>
+        </div>
+
+        <div class="lg:col-span-8 space-y-6">
+            <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+                <div class="glass-panel p-6 rounded-2xl text-center border-b-2 border-teal-500">
+                    <p class="text-[10px] text-gray-400 uppercase tracking-widest">Akumulasi Laba</p>
+                    <h3 id="statLaba" class="text-2xl font-bold text-teal-400 mt-1">+ Rp 0</h3>
+                </div>
+                <div class="glass-panel p-6 rounded-2xl text-center border-b-2 border-blue-500">
+                    <p class="text-[10px] text-gray-400 uppercase tracking-widest">Setoran Mitra</p>
+                    <h3 id="statSetoran" class="text-2xl font-bold text-blue-400 mt-1">Rp 0</h3>
+                </div>
+                <div class="glass-panel p-6 rounded-2xl text-center border-b-2 border-orange-500">
+                    <p class="text-[10px] text-gray-400 uppercase tracking-widest">Sisa Stok</p>
+                    <h3 id="statSisa" class="text-2xl font-bold text-orange-400 mt-1">0 Pcs</h3>
+                </div>
+            </div>
+
+            <div class="glass-panel p-8 rounded-3xl shadow-2xl">
+                <h3 class="text-lg font-bold text-white mb-4">Tren Keuntungan</h3>
+                <canvas id="chartLaba" height="100"></canvas>
+            </div>
+
+            <div class="glass-panel p-8 rounded-3xl shadow-2xl">
+                <div class="flex justify-between items-center mb-6">
+                    <h3 class="text-xl font-bold text-white uppercase tracking-wider">Riwayat Transaksi</h3>
+                    <button onclick="unduhExcel()" class="bg-emerald-600 hover:bg-emerald-500 text-white text-[10px] font-bold py-2 px-4 rounded-lg flex items-center gap-2 transition">
+                        UNDUH EXCEL
+                    </button>
+                </div>
+                <div class="overflow-x-auto">
+                    <table class="w-full text-left text-sm" id="logTable">
+                        <thead class="text-teal-400 uppercase text-[10px] tracking-widest border-b border-teal-900/50">
+                            <tr>
+                                <th class="pb-4">Tanggal</th>
+                                <th class="pb-4">Barang</th>
+                                <th class="pb-4">Sisa</th>
+                                <th class="pb-4 text-right">Laba (+500)</th>
+                            </tr>
+                        </thead>
+                        <tbody id="logBody" class="text-gray-300 divide-y divide-teal-900/30"></tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // 1. KONFIGURASI UTAMA
+        const scriptURL = 'https://script.google.com/macros/s/AKfycbz7fqO0UunCLsdaNv_3x0DiLHnSdXOPufnELB1mxswihlm4HBJxS_ZXCb34FW9OESO4/exec'; 
+        let saldoAwal = 0;
+        let totalLabaAcumulated = 0;
+
+        // 2. INISIALISASI TANGGAL & GRAFIK
+        document.getElementById('currentDate').innerText = new Date().toLocaleDateString('id-ID', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' });
+        
+        const ctx = document.getElementById('chartLaba').getContext('2d');
+        const chartLaba = new Chart(ctx, {
+            type: 'line',
+            data: { labels: [], datasets: [{ label: 'Laba', data: [], borderColor: '#2dd4bf', backgroundColor: 'rgba(45, 212, 191, 0.1)', fill: true, tension: 0.4 }] },
+            options: { plugins: { legend: { display: false } }, scales: { y: { ticks: { color: '#94a3b8' }, grid: { color: 'rgba(255,255,255,0.05)' } }, x: { ticks: { color: '#94a3b8' }, grid: { display: false } } } }
+        });
+
+        // 3. SINKRONISASI DATA SAAT LOAD
+        // Tambahkan ini di bagian paling atas script setelah variabel global
+window.onload = function() {
+    // Tampilkan status memuat
+    document.getElementById('statLaba').innerText = "Memuat...";
+    document.getElementById('displaySaldoTotal').innerText = "Memuat...";
+
+    fetch(scriptURL)
+        .then(response => response.json())
+        .then(data => {
+            // Update variabel global dengan data dari database
+            totalLabaAcumulated = data.laba;
+            // Menghitung mundur saldo awal agar tetap konsisten
+            saldoAwal = data.saldo - data.laba;
+            if(isNaN(saldoAwal)) saldoAwal = 0;
+
+            // Update Tampilan Dashboard
+            updateDisplay();
+
+            // Isi kembali tabel riwayat dari database
+            const logBody = document.getElementById('logBody');
+            logBody.innerHTML = ''; // Bersihkan tabel
+            data.riwayat.forEach(item => {
+                logBody.insertAdjacentHTML('beforeend', `
+                    <tr>
+                        <td class="py-4 text-[10px]">${item.tanggal}</td>
+                        <td class="py-4 font-medium text-white">${item.nama}</td>
+                        <td class="py-4 text-orange-400">${item.sisa} Pcs</td>
+                        <td class="py-4 text-right text-teal-400">+Rp ${item.laba.toLocaleString()}</td>
+                    </tr>
+                `);
+            });
+
+            // Update Grafik dengan laba yang ada
+            chartLaba.data.labels = data.riwayat.map(item => item.nama).reverse();
+            chartLaba.data.datasets[0].data = data.riwayat.map((_, i) => {
+                // Simulasi pertumbuhan laba pada grafik
+                return data.laba; 
+            }).reverse();
+            chartLaba.update();
+        })
+        .catch(error => {
+            console.error("Gagal sinkronisasi:", error);
+            updateDisplay();
+        });
+};
+
+        // 4. FUNGSI LOGIKA UI
+        function setSaldoAwal() {
+            const input = prompt("Atur modal awal owner (Rp):", saldoAwal);
+            if (input !== null) { saldoAwal = parseInt(input) || 0; updateDisplay(); }
+        }
+
+        function updateDisplay() {
+            document.getElementById('displaySaldoTotal').innerText = 'Rp ' + (saldoAwal + totalLabaAcumulated).toLocaleString('id-ID');
+            document.getElementById('statLaba').innerText = '+ Rp ' + totalLabaAcumulated.toLocaleString('id-ID');
+        }
+
+        // 5. INPUT DATA & POST KE DATABASE
+        document.getElementById('ownerForm').addEventListener('submit', function(e) {
+            e.preventDefault();
+            const nama = document.getElementById('nama').value;
+            const harga = parseInt(document.getElementById('harga').value);
+            const masuk = parseInt(document.getElementById('masuk').value);
+            const terjual = parseInt(document.getElementById('terjual').value);
+
+            const sisa = masuk - terjual;
+            const laba = terjual * 500;
+            const setoran = terjual * harga;
+            const tgl = new Date().toLocaleDateString('id-ID');
+
+            totalLabaAcumulated += laba;
+            updateDisplay();
+
+            // Update UI Stats & Table
+            document.getElementById('statSetoran').innerText = 'Rp ' + setoran.toLocaleString('id-ID');
+            document.getElementById('statSisa').innerText = sisa + ' Pcs';
+            document.getElementById('logBody').insertAdjacentHTML('afterbegin', `<tr><td class="py-4 text-[10px]">${tgl}</td><td class="py-4 font-medium text-white">${nama}</td><td class="py-4 text-orange-400">${sisa} Pcs</td><td class="pb-4 text-right text-teal-400">+Rp ${laba.toLocaleString()}</td></tr>`);
+
+            // Update Grafik
+            chartLaba.data.labels.push(nama);
+            chartLaba.data.datasets[0].data.push(totalLabaAcumulated);
+            chartLaba.update();
+
+            // Kirim ke Google Sheets
+            if(scriptURL) {
+                fetch(scriptURL, {
+                    method: 'POST',
+                    mode: 'no-cors',
+                    body: JSON.stringify({
+                        tanggal: tgl, nama, harga, masuk, terjual, sisa, laba, setoran, saldo: saldoAwal + totalLabaAcumulated
+                    })
+                });
+            }
+            this.reset();
+        });
+
+        function unduhExcel() {
+            const wb = XLSX.utils.table_to_book(document.getElementById("logTable"), { sheet: "Laporan PATMA MART" });
+            XLSX.writeFile(wb, `Laporan_PatmaMart_${new Date().getTime()}.xlsx`);
+        }
+    </script>
+</body>
+</html>
